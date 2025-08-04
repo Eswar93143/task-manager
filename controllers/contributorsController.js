@@ -1,7 +1,9 @@
 const contributorModel = require("../models/contributorsModel");
 
 exports.getContributors = async (req, res, next) => {
-    const contributors = await contributorModel.find({});
+    let { page, size } = req.params;
+    page = page ? page : 1;
+    const contributors = await contributorModel.find({},{}, {limit: page, skip: (page - 1) * size});
     res.json({
         status: 'success',
         contributors
