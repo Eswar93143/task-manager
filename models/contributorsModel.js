@@ -5,10 +5,11 @@ const contributorsSchema = mongoose.Schema({
 	firstName: {type: String, required: true},
 	lastName: {type: String, required: true},
 	email: String,
-	dob: {type:String, unique: true, required: true},
+	dob: {type:String},
 	role: {type: Number, required: true},
 	status: {type: Number, required: true},
-	Department: Number
+	department: Number,
+	password: String
 });
 
 const contributorModel = mongoose.model('contributor', contributorsSchema);
