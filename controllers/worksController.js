@@ -23,8 +23,6 @@ exports.getWorkById = async (req, res) => {
 
 exports.createWork = async (req, res, next) => {
     try {
-        console.log('bbhvh ', req.body)
-
         const newWork = new WorkModel(req.body); // workId auto-generated
         const savedWork = await newWork.save();
         const tasks = new TaskModel({
@@ -84,6 +82,7 @@ exports.getTasks = async (req, res) => {
     try {
         const workId = req.params.workId;
         const tasks = await TaskModel.findOne({ workId: workId });
+        if(!tasks) return res.status(404).json({status: 'Not found'});
         res.status(200).json(tasks.tasks);
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -210,7 +209,7 @@ exports.deleteTask = async (req, res) => {
             if (taskInd != -1) {
                 statusToCreateTask.taskItems.splice(taskInd, 0);
                 allTaskOfThisWork = { ...allTaskOfThisWork };
-                const savedTask = await TaskModel.findOneAndUpdate({ workId },
+                const savedTask = await TaskModel.findOneAndDelete({ workId },
                     allTaskOfThisWork,
                     { new: true });
                 res.status(200).json(statusToCreateTask.taskItems[taskInd]);
@@ -224,3 +223,90 @@ exports.deleteTask = async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 };
+
+
+// Status
+// req.body = {
+//     statusFrom: '',
+//     statusTo: '',
+//     workId: '',
+//     taskId: ''
+//     newIndex: 0
+// }
+exports.dragTask = async (req, res) => {
+    const workId = req.body.workId;
+    const taskId = req.body.taskId;
+    let allTaskOfThisWork = await TaskModel.findOne({ workId });
+    if (allTaskOfThisWork) {
+        const allTasksInFrom = allTaskOfThisWork.tasks.find(x => x.status === req.body.statusFrom).taskItems;
+        const taskIndToMove = allTasksInFrom.findIndex(x => x.taskId === taskId);
+        const taskToMove = allTasksInFrom[taskIndToMove];
+        // Add task to new status
+        const allTasksInTo = allTaskOfThisWork.tasks.find(x => x.status === req.body.statusTo).taskItems;
+        allTasksInTo.splice(req.body.newIndex, 0, taskToMove);
+        // Delete task from existing status
+        allTasksInFrom.splice(taskIndToMove, 1);
+        allTaskOfThisWork = { ...allTaskOfThisWork };
+        const updatedStatuses = await TaskModel.findOneAndUpdate({ workId },
+            allTaskOfThisWork,
+            { new: true }
+        );
+        res.status(200).json({ status: 'success' });
+    } else {
+        return res.status(404).json({ message: 'Work not found' });
+    }
+}
+
+// req.body ={
+// statusName: '' 
+// statusInd: 0
+// }
+exports.addStatus = async (req, res) => {
+    const workId = req.params.workId;
+    const { statusInd, statusName } = req.body;
+    let allTaskOfThisWork = await TaskModel.findOne({ workId });
+    if (allTaskOfThisWork) {
+        allTaskOfThisWork.tasks.splice(statusInd, 0, {
+            status: statusName,
+            taskItems: []
+        });
+
+        res.status(200).json({ status: 'success' });
+    } else {
+        return res.status(404).json({ message: 'Work not found' });
+    }
+}
+
+// Update status
+// req.body ={
+// statusName: '' 
+// oldInd: 0,
+//  newInd: 0
+// }
+exports.updateStatus = async (req, res) => {
+    const workId = req.params.workId;
+    const status= req.params.status;
+    const { statusName, oldInd, newInd } = req.body;
+    let allTaskOfThisWork = await TaskModel.findOne({ workId });
+    if(allTaskOfThisWork){
+        if(newInd != oldInd){
+            allTaskOfThisWork.tasks.find(x => x.status === status).status = statusName;
+            allTaskOfThisWork = [...allTaskOfThisWork];
+            await TaskModel.findOneAndUpdate({ workId },
+                allTaskOfThisWork,
+                { new: true }
+            );
+            res.status(200).json({ status: 'success' });
+        } else {
+            const indOfStatus = allTaskOfThisWork.tasks.findIndex(x => x.status === status);
+            let statuses = allTaskOfThisWork.tasks[indOfStatus];
+            // Remove status from old ind
+            allTaskOfThisWork.tasks.splice(indOfStatus, 1);
+            // Add status to current ind
+            allTaskOfThisWork.tasks.splice(indOfStatus, 0, statuses);
+            res.status(200).json({ status: 'drag success' });
+        }
+    } else {
+        return res.status(404).json({ message: 'Work not found' });
+    }
+}
